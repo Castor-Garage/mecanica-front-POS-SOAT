@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import './App.css'
 
 type Admin = { id: string; name: string; email: string }
@@ -53,9 +54,10 @@ type ServiceStat = {
   avgExecutionMinutes: number
 }
 
+
 type Paginated<T> = { data: T[] }
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
 async function apiRequest<T>(
   path: string,
@@ -78,11 +80,30 @@ async function apiRequest<T>(
     } catch {
       // ignore invalid json error payloads
     }
-    throw new Error(message)
+    const err = new Error(message)
+    ;(err as Error & { status: number }).status = response.status
+    throw err
   }
 
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+function maskDocument(value: string, type: 'CPF' | 'CNPJ') {
+  const digits = value.replace(/\D/g, '')
+  if (type === 'CPF') {
+    return digits
+      .slice(0, 11)
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+  }
+  return digits
+    .slice(0, 14)
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
 }
 
 function money(value: number) {
@@ -159,6 +180,13 @@ function App() {
       setOrders(orderRes.data)
       setStats(statsRes)
     } catch (err) {
+      if (err instanceof Error && (err as Error & { status: number }).status === 401) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('admin')
+        setToken(null)
+        setAdmin(null)
+        return
+      }
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados')
     } finally {
       setLoading(false)
@@ -210,7 +238,7 @@ function App() {
     try {
       await apiRequest<Client>(
         '/clients',
-        { method: 'POST', body: JSON.stringify(clientForm) },
+        { method: 'POST', body: JSON.stringify({ ...clientForm, document: clientForm.document.replace(/\D/g, '') }) },
         token,
       )
       setClientForm({ name: '', document: '', documentType: 'CPF', phone: '' })
@@ -384,6 +412,9 @@ function App() {
             </button>
           </form>
           {error && <p className="feedback error">{error}</p>}
+          <Link to="/acompanhar" className="btn" style={{ marginTop: '1rem', width: '100%', textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+            Acompanhar minha OS
+          </Link>
         </section>
       </main>
     )
@@ -478,7 +509,13 @@ function App() {
                 Documento
                 <input
                   value={clientForm.document}
-                  onChange={(e) => setClientForm((old) => ({ ...old, document: e.target.value }))}
+                  onChange={(e) =>
+                    setClientForm((old) => ({
+                      ...old,
+                      document: maskDocument(e.target.value, old.documentType),
+                    }))
+                  }
+                  placeholder={clientForm.documentType === 'CPF' ? '000.000.000-00' : '00.000.000/0000-00'}
                   required
                 />
               </label>
@@ -490,6 +527,7 @@ function App() {
                     setClientForm((old) => ({
                       ...old,
                       documentType: e.target.value as 'CPF' | 'CNPJ',
+                      document: '',
                     }))
                   }
                 >
