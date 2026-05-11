@@ -75,8 +75,15 @@ async function apiRequest<T>(
   if (!response.ok) {
     let message = `Erro ${response.status}`
     try {
-      const body = (await response.json()) as { detail?: string; message?: string }
+      const body = (await response.json()) as {
+        detail?: string
+        message?: string
+        errors?: { field: string; message: string }[]
+      }
       message = body.detail ?? body.message ?? message
+      if (body.errors?.length) {
+        message += ': ' + body.errors.map((e) => `${e.field} — ${e.message}`).join('; ')
+      }
     } catch {
       // ignore invalid json error payloads
     }
@@ -390,9 +397,7 @@ function App() {
         <section className="ink-card login-card">
           <img className="brand-logo" src="/Castor-garage.png" alt="Oficina do Pastor Garage" />
           <p className="eyebrow">OFICINA PRETO NO BRANCO</p>
-          <h1>PAINEL GARAGE</h1>
-          <p className="sub">Entre com o admin para consumir a API.</p>
-          <p className="sub">API alvo: {API_URL}</p>
+          <h1>PORTAL CASTOR GARAGE</h1>
           <form onSubmit={handleLogin} className="grid-form">
             <label>
               Email

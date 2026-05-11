@@ -31,7 +31,7 @@ function money(value: number) {
 }
 
 export function TrackOrder() {
-  const [trackingId, setTrackingId] = useState('')
+  const [trackingId, setTrackingId] = useState('OS-')
   const [order, setOrder] = useState<TrackedOrder | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -42,7 +42,7 @@ export function TrackOrder() {
     setError(null)
     setOrder(null)
     try {
-      const response = await fetch(`${API_URL}/service-orders/${trackingId.trim()}`)
+      const response = await fetch(`${API_URL}/service-orders/track/${trackingId.trim()}`)
       if (!response.ok) {
         let message = `Erro ${response.status}`
         try {
@@ -74,7 +74,7 @@ export function TrackOrder() {
             <input
               value={trackingId}
               onChange={(e) => setTrackingId(e.target.value)}
-              placeholder="ex: 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              placeholder="ex: OS-2026-00123"
               required
             />
           </label>
