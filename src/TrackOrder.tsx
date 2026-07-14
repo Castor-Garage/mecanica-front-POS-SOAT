@@ -36,11 +36,22 @@ export function TrackOrder() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [emailTo, setEmailTo] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailFeedback, setEmailFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const [decisionLoading, setDecisionLoading] = useState(false)
+  const [decisionFeedback, setDecisionFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
     setError(null)
     setOrder(null)
+    setShowEmailForm(false)
+    setEmailFeedback(null)
+    setDecisionFeedback(null)
     try {
       const response = await fetch(`${API_URL}/service-orders/track/${trackingId.trim()}`)
       if (!response.ok) {
@@ -57,6 +68,69 @@ export function TrackOrder() {
       setError(err instanceof Error ? err.message : 'OS não encontrada')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleSendEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!order) return
+    setSendingEmail(true)
+    setEmailFeedback(null)
+    try {
+      const response = await fetch(`${API_URL}/service-orders/${order.id}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailTo }),
+      })
+      if (!response.ok) {
+        let message = `Erro ${response.status}`
+        try {
+          const body = (await response.json()) as { detail?: string; message?: string }
+          message = body.detail ?? body.message ?? message
+        } catch { /* ignore */ }
+        throw new Error(message)
+      }
+      setEmailFeedback({ type: 'success', text: 'E-mail enviado com sucesso.' })
+      setEmailTo('')
+    } catch (err) {
+      setEmailFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Não foi possível enviar o e-mail',
+      })
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
+  async function handleDecision(action: 'approve' | 'reject') {
+    if (!order) return
+    setDecisionLoading(true)
+    setDecisionFeedback(null)
+    try {
+      const response = await fetch(`${API_URL}/service-orders/track/${order.orderNumber}/${action}`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        let message = `Erro ${response.status}`
+        try {
+          const body = (await response.json()) as { detail?: string; message?: string }
+          message = body.detail ?? body.message ?? message
+        } catch { /* ignore */ }
+        throw new Error(message)
+      }
+      const data = (await response.json()) as TrackedOrder
+      setOrder(data)
+      setDecisionFeedback({
+        type: 'success',
+        text: action === 'approve' ? 'Orçamento aprovado com sucesso.' : 'Orçamento rejeitado.',
+      })
+    } catch (err) {
+      setDecisionFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Não foi possível registrar sua decisão',
+      })
+    } finally {
+      setDecisionLoading(false)
     }
   }
 
@@ -125,6 +199,85 @@ export function TrackOrder() {
                   ))}
                 </ul>
               </>
+            )}
+
+            {order.status === 'AGUARDANDO_APROVACAO' && (
+              <div className="action-row" style={{ marginTop: '1rem' }}>
+                <button
+                  className="btn mini"
+                  disabled={decisionLoading}
+                  onClick={() => void handleDecision('approve')}
+                >
+                  Aprovar
+                </button>
+                <button
+                  className="btn mini"
+                  disabled={decisionLoading}
+                  onClick={() => void handleDecision('reject')}
+                >
+                  Rejeitar
+                </button>
+              </div>
+            )}
+
+            {decisionFeedback && (
+              <p
+                className={`feedback ${decisionFeedback.type === 'error' ? 'error' : 'success'}`}
+                style={{ marginTop: '0.75rem' }}
+              >
+                {decisionFeedback.text}
+              </p>
+            )}
+
+            {!showEmailForm && (
+              <button
+                type="button"
+                className="btn"
+                style={{ marginTop: '1rem', width: '100%' }}
+                onClick={() => {
+                  setShowEmailForm(true)
+                  setEmailFeedback(null)
+                }}
+              >
+                Enviar por e-mail
+              </button>
+            )}
+
+            {showEmailForm && (
+              <form onSubmit={handleSendEmail} className="grid-form" style={{ marginTop: '1rem' }}>
+                <label>
+                  E-mail de destino
+                  <input
+                    type="email"
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                    placeholder="cliente@exemplo.com"
+                    required
+                  />
+                </label>
+                <button className="btn btn-solid" type="submit" disabled={sendingEmail}>
+                  {sendingEmail ? 'Enviando...' : 'Enviar'}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setShowEmailForm(false)
+                    setEmailFeedback(null)
+                  }}
+                >
+                  Voltar
+                </button>
+              </form>
+            )}
+
+            {emailFeedback && (
+              <p
+                className={`feedback ${emailFeedback.type === 'error' ? 'error' : 'success'}`}
+                style={{ marginTop: '0.75rem' }}
+              >
+                {emailFeedback.text}
+              </p>
             )}
           </div>
         )}
