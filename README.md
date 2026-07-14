@@ -1,73 +1,76 @@
-# React + TypeScript + Vite
+# Castor Garage - Front-end
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Front-end (painel administrativo + acompanhamento público de OS) para o sistema de gestão de oficina mecânica, consumindo a [API Castor Garage](../mecanica-pos-SOAT).
 
-Currently, two official plugins are available:
+Projeto desenvolvido para a turma 2026 de **SOAT - FIAP**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Funcionalidades
 
-## React Compiler
+### Painel administrativo (`/`, atrás de login)
+- Login de administrador (JWT)
+- CRUD de clientes, veículos, serviços e peças
+- Abertura de ordens de serviço (OS)
+- Listagem de OS com ações **Avançar**, **Aprovar** e **Rejeitar** orçamento
+- Dashboard com estatísticas de tempo médio de execução por serviço
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Acompanhamento público (`/acompanhar`)
+- Consulta de uma OS pelo número (`OS-YYYY-NNNNN`), sem necessidade de login
+- **Aprovar/Rejeitar orçamento**: exibido apenas quando a OS está com status "Aguardando aprovação" — some automaticamente após a decisão
+- **Enviar por e-mail**: pede um endereço de e-mail e envia um resumo da OS (status, veículo, orçamento, serviços e peças) para esse endereço — o e-mail digitado não é salvo em nenhum lugar, é usado só naquele envio
 
-## Expanding the ESLint configuration
+## Stack Tecnológico
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **React 19** + **TypeScript**
+- **Vite** (dev server / build)
+- **react-router-dom** — roteamento (`/` e `/acompanhar`)
+- Sem biblioteca de estado ou UI kit — `useState`/`useMemo` e CSS próprio (`App.css`)
+- Comunicação com a API via `fetch` direto (sem axios/cliente HTTP dedicado)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Como Rodar Local
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 1. Instalar dependências
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Configurar variáveis de ambiente
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Copie `.env.example` para `.env` e ajuste a URL da API:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
+```
+
+```env
+VITE_API_URL=http://localhost:3000
+```
+
+### 3. Subir o backend
+
+Este front depende da [API Castor Garage](../mecanica-pos-SOAT) rodando (local ou remota) na URL configurada em `VITE_API_URL`.
+
+### 4. Rodar em desenvolvimento
+
+```bash
+npm run dev
+```
+
+- App: `http://localhost:5173`
+- Login padrão (seed do backend): `admin@oficina.com` / `Admin@123`
+- Acompanhamento público: `http://localhost:5173/acompanhar`
+
+## Scripts Disponíveis
+
+```bash
+npm run dev       # Servidor de desenvolvimento (Vite)
+npm run build     # Typecheck (tsc -b) + build de produção
+npm run lint      # ESLint
+npm run preview   # Preview do build de produção
+```
+
+## Variáveis de Ambiente
+
+```env
+VITE_API_URL=http://localhost:3000   # URL base da API
 ```
