@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+const BILLING_URL = import.meta.env.VITE_BILLING_URL ?? 'http://localhost:3002'
 
 type TrackedOrder = {
   id: string
@@ -43,6 +44,10 @@ export function TrackOrder() {
 
   const [decisionLoading, setDecisionLoading] = useState(false)
   const [decisionFeedback, setDecisionFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -99,6 +104,34 @@ export function TrackOrder() {
       })
     } finally {
       setSendingEmail(false)
+    }
+  }
+
+  async function handleStripeCheckout() {
+    if (!order) return
+    setCheckoutLoading(true)
+    setCheckoutError(null)
+    try {
+      const description = order.items.length > 0
+        ? order.items.map((i) => i.serviceName).join(', ')
+        : order.problemDescription ?? 'Serviço automotivo'
+      const amount = order.quoteTotalAmount ?? 0
+      const res = await fetch(`${BILLING_URL}/debug/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceOrderId: order.id, description, amount }),
+      })
+      if (!res.ok) {
+        const body = (await res.json()) as { detail?: string; message?: string }
+        throw new Error(body.detail ?? body.message ?? `Erro ${res.status}`)
+      }
+      const data = (await res.json()) as { checkoutUrl: string }
+      window.open(data.checkoutUrl, '_blank')
+      setShowCheckoutModal(false)
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Erro ao criar checkout')
+    } finally {
+      setCheckoutLoading(false)
     }
   }
 
@@ -204,11 +237,10 @@ export function TrackOrder() {
             {order.status === 'AGUARDANDO_APROVACAO' && (
               <div className="action-row" style={{ marginTop: '1rem' }}>
                 <button
-                  className="btn mini"
-                  disabled={decisionLoading}
-                  onClick={() => void handleDecision('approve')}
+                  className="btn mini btn-solid"
+                  onClick={() => { setShowCheckoutModal(true); setCheckoutError(null) }}
                 >
-                  Aprovar
+                  Aprovar e Pagar
                 </button>
                 <button
                   className="btn mini"
@@ -227,6 +259,53 @@ export function TrackOrder() {
               >
                 {decisionFeedback.text}
               </p>
+            )}
+
+            {showCheckoutModal && order && (
+              <div style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem',
+              }}>
+                <div className="ink-card" style={{ width: 'min(460px, 100%)', display: 'grid', gap: '0.75rem' }}>
+                  <p className="eyebrow" style={{ margin: 0 }}>Confirmar pagamento</p>
+                  <h2 style={{ margin: 0 }}>Resumo do orçamento</h2>
+
+                  <div style={{ display: 'grid', gap: '0.3rem', borderTop: '2px solid var(--line)', paddingTop: '0.6rem' }}>
+                    {order.items.map((item) => (
+                      <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
+                        <span>{item.serviceName} × {item.quantity}</span>
+                        <strong>{money(item.unitPrice * item.quantity)}</strong>
+                      </div>
+                    ))}
+                    {order.parts.map((part) => (
+                      <div key={part.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
+                        <span>{part.partName} × {part.quantity}</span>
+                        <strong>{money(part.unitPrice * part.quantity)}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid var(--line)', paddingTop: '0.6rem' }}>
+                    <span style={{ fontFamily: 'Anton, sans-serif', fontSize: '1.1rem', textTransform: 'uppercase' }}>Total</span>
+                    <span style={{ fontFamily: 'Anton, sans-serif', fontSize: '1.4rem' }}>{money(order.quoteTotalAmount ?? 0)}</span>
+                  </div>
+
+                  {checkoutError && <p className="feedback error" style={{ margin: 0 }}>{checkoutError}</p>}
+
+                  <div className="grid-form">
+                    <button
+                      className="btn btn-solid"
+                      disabled={checkoutLoading}
+                      onClick={() => void handleStripeCheckout()}
+                    >
+                      {checkoutLoading ? 'Aguarde...' : 'Pagar com Stripe'}
+                    </button>
+                    <button className="btn" onClick={() => setShowCheckoutModal(false)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {!showEmailForm && (
